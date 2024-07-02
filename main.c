@@ -33,8 +33,29 @@ static LIST_HEAD(secret_list); // Lined list head for keeping track of stored se
 static int next_id = 1;
 
 // Read secret function
-static int secrets_read(){
-    return 0;
+static ssize_t secrets_read(struct file *file, const char __user *buf, size_t count, loff_t *pos){
+    struct secret *s;
+    int id;
+    char tmp[BUFSIZE];
+    int len = 0;
+
+    // Convert user id from string to integer
+    if (kstrtoint_from_user(buf, count, 10, &id)) {
+        return -EINVAL;
+    }
+
+    // Traverse the list of secrets to find the secret with user id
+    list_for_each_entry(s, &secret_list, list) {
+        if (s->id == id) {
+            len = snprintf(tmp, BUFSIZE, "ID: %d, Secret: %s\n", s->id, s->data);
+            // Copy formatted data from kernel space to user space
+            if (copy_to_user(buf, tmp, len)) {
+                return -EFAULT;
+            }
+            return len;
+        }
+    }
+    return -ENOENT;
 }
 
 
