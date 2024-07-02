@@ -99,8 +99,25 @@ static ssize_t secrets_write(struct file *file, const char __user *buf, size_t c
 
 
 // Delete secret function
-static int secrets_delete(){
-    return 0;
+static int secrets_delete(struct file *file, const char __user *buf, size_t count, loff_t *pos) {
+    struct secret *s;
+    int id;
+
+    // Convert user id from string to integer
+    if (kstrtoint_from_user(buf, count, 10, &id)) {
+        return -EINVAL;
+    }
+
+    // Traverse the list of secrets to find the secret with user id
+    list_for_each_entry(s, &secret_list, list) {
+        if (s->id == id) {
+            // Remove the secret from the linked list and free the memory
+            list_del(&s->list);
+            kfree(s);
+            return 0;
+        }
+    }
+    return -ENOENT;
 }
 
 
