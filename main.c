@@ -40,10 +40,21 @@ static int secrets_delete(){
 
 
 // Initialization function for the module
-static int __init secrets_init(void) {}
+static int __init secrets_init(void) {
+    proc_entry = proc_create(PROC_NAME, 0666, NULL, &proc_file_ops);
+    if (!proc_entry) {
+        printk(KERN_ERR "Failed to create /proc/%s\n", PROC_NAME);
+        return -ENOMEM;
+    }
+    printk(KERN_INFO "/proc/%s created\n", PROC_NAME);
+    return 0;
+}
 
 // Exiting function for the module
-static void __exit secrets_exit(void) {}
+static void __exit secrets_exit(void) {
+    proc_remove(proc_entry);
+    printk(KERN_INFO "/proc/%s removed\n", PROC_NAME);
+}
 
 module_init(secrets_init);
 module_exit(secrets_exit);
