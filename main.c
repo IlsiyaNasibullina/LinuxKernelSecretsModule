@@ -19,8 +19,7 @@ static struct proc_dir_entry *proc_entry; // Pointer to proc directory entry
 // Proc file operations
 static struct proc_ops proc_file_ops = {
         .proc_read = secrets_read,
-        .proc_write = secrets_write,
-        .proc_delete = secrets_delete
+        .proc_write = secrets_write
 };
 
 // Structure of secret with id and secret data
@@ -64,7 +63,29 @@ static ssize_t secrets_write(struct file *file, const char __user *buf, size_t c
     struct secret *new_secret;
     char tmp[BUFSIZE];
     int len;
+    int id;
 
+    // Copy user data from buf to tmp buffer
+    if (copy_from_user(tmp, buf, count)) {
+        return -EFAULT;
+    }
+    tmp[count] = '\0';
+
+    // Check if the operation is deletion
+    if (sscanf(tmp, "delete:%d", &id) == 1) {
+        // Traverse the list of secrets to find the secret with user id
+        list_for_each_entry(new_secret, &secret_list, list) {
+            if (new_secret->id == id) {
+                // Remove the secret from the linked list and free the memory
+                list_del(&new_secret->list);
+                kfree(new_secret);
+                return count;
+            }
+        }
+        return -ENOENT;
+    }
+
+    // Otherwise perform write command
     // Return error if the data size exceeds BUFSIZE
     if (count >= BUFSIZE) {
         return -EINVAL;
@@ -75,13 +96,6 @@ static ssize_t secrets_write(struct file *file, const char __user *buf, size_t c
     if (!new_secret) {
         return -ENOMEM; // Return out of memory error if allocation fails
     }
-
-    // Copy user secret from buf to tmp buffer
-    if (copy_from_user(tmp, buf, count)) {
-        kfree(new_secret);
-        return -EFAULT;
-    }
-    tmp[count] = '\0';
 
     // Assign id to new secret and copy data into struct
     new_secret->id = next_id++;
@@ -95,29 +109,6 @@ static ssize_t secrets_write(struct file *file, const char __user *buf, size_t c
     }
 
     return len;
-}
-
-
-// Delete secret function
-static int secrets_delete(struct file *file, const char __user *buf, size_t count, loff_t *pos) {
-    struct secret *s;
-    int id;
-
-    // Convert user id from string to integer
-    if (kstrtoint_from_user(buf, count, 10, &id)) {
-        return -EINVAL;
-    }
-
-    // Traverse the list of secrets to find the secret with user id
-    list_for_each_entry(s, &secret_list, list) {
-        if (s->id == id) {
-            // Remove the secret from the linked list and free the memory
-            list_del(&s->list);
-            kfree(s);
-            return 0;
-        }
-    }
-    return -ENOENT;
 }
 
 
